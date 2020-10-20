@@ -629,15 +629,17 @@ func (r *CRD) GoCodeSetInput(
 		var found bool
 		sourceAdaptedVarName := sourceVarName
 		crdField, found = r.SpecFields[renamedName]
+		// TODO(muvaf): The field path here for the actual spec fields should be
+		// configurable.
 		if found {
-			sourceAdaptedVarName += ".Spec"
+			sourceAdaptedVarName += ".Spec.ForProvider"
 		} else {
 			crdField, found = r.StatusFields[memberName]
 			if !found {
 				// TODO(jaypipes): check generator config for exceptions?
 				continue
 			}
-			sourceAdaptedVarName += ".Status"
+			sourceAdaptedVarName += ".Status.AtProvider"
 		}
 		sourceAdaptedVarName += "." + crdField.Names.Camel
 

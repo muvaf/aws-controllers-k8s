@@ -18,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/aws/aws-controllers-k8s/services/{{ .ServiceIDClean }}/apis/{{ .APIVersion }}"
+	"github.com/muvaf/test-generated-aws/apis/{{ .ServiceIDClean }}/{{ .APIVersion}}"
 )
 
 // Hack to avoid import errors during build...
@@ -29,6 +30,23 @@ var (
 	_ = ackv1alpha1.AWSAccountID("")
 	_ = &ackerr.NotFound
 )
+
+// GenerateCreateRepositoryInput returns a CreateRepositoryInput object.
+func GenerateCreateRepositoryInput(cr *{{ .APIVersion}}.{{ .CRD.Names.Camel }}) *svcsdk.{{ .CRD.Ops.Create.InputRef.Shape.ShapeName }} {
+	res := &svcsdk.{{ .CRD.Ops.Create.InputRef.Shape.ShapeName }}{}
+{{ GoCodeSetCreateInput .CRD "cr" "res" 1 }}
+	return res
+}
+
+{{ if .CRD.Ops.Delete -}}
+// newDeleteRequestPayload returns an SDK-specific struct for the HTTP request
+// payload of the Delete API call for the resource
+func GenerateDeleteRepositoryInput(cr *{{ .APIVersion}}.{{ .CRD.Names.Camel }}) *svcsdk.{{ .CRD.Ops.Delete.InputRef.Shape.ShapeName }} {
+	res := &svcsdk.{{ .CRD.Ops.Delete.InputRef.Shape.ShapeName }}{}
+{{ GoCodeSetDeleteInput .CRD "cr" "res" 1 }}
+	return res
+}
+{{- end -}}
 
 // sdkFind returns SDK-specific information about a supplied resource
 func (rm *resourceManager) sdkFind(
