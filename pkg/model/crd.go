@@ -1544,14 +1544,14 @@ func (r *CRD) goCodeSetOutputReadMany(
 		targetAdaptedVarName := targetVarName
 		crdField, found = r.SpecFields[memberName]
 		if found {
-			targetAdaptedVarName += ".Spec"
+			targetAdaptedVarName += ".Spec.ForProvider"
 		} else {
 			crdField, found = r.StatusFields[memberName]
 			if !found {
 				// TODO(jaypipes): check generator config for exceptions?
 				continue
 			}
-			targetAdaptedVarName += ".Status"
+			targetAdaptedVarName += ".Status.AtProvider"
 		}
 		out += fmt.Sprintf(
 			"%s\tif %s != nil {\n", indent, sourceAdaptedVarName,

@@ -17,6 +17,7 @@ import (
 	svcsdkapi "github.com/aws/aws-sdk-go/service/{{ .ServiceIDClean }}/{{ .ServiceIDClean }}iface"
 	svcapi "github.com/aws/aws-sdk-go/service/{{ .ServiceIDClean }}"
 	"github.com/aws/aws-sdk-go/aws/session"
+	ackerr "github.com/aws/aws-controllers-k8s/pkg/errors"
 
 	"github.com/muvaf/test-generated-aws/apis/{{ .ServiceIDClean }}/{{ .APIVersion}}"
 	awsclient "github.com/muvaf/test-generated-aws/pkg/client"
@@ -73,10 +74,26 @@ func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.
 	}
 
 	cr.SetConditions(runtimev1alpha1.Available())
+  {{- if .CRD.Ops.ReadMany }}
+	input := Generate{{ .CRD.Ops.ReadMany.InputRef.Shape.ShapeName }}(cr)
+	// TODO(muvaf): Generated conversion code has logic about the input, like if(len...)
+	// and has a return statement we can't control here in an arbitrary function.
+	// TODO(muvaf): Generated code has an assumption about the module name of the type (svcapitypes)
+	// but that doesn't always hold true.
+{{ $setCode := GoCodeSetReadManyOutput .CRD "resp" "cr" 1 }}
+	{{ if not ( Empty $setCode ) }}resp{{ else }}_{{ end }}, err := e.client.{{ .CRD.Ops.ReadMany.Name }}WithContext(ctx, input)
+	if err != nil {
+		if awsErr, ok := ackerr.AWSError(err); ok && awsErr.Code() == "{{ ResourceExceptionCode .CRD 404 }}" {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
+		return managed.ExternalObservation{}, err
+	}
+{{ $setCode }}
+{{- end }}
 
 	return managed.ExternalObservation{
 		ResourceExists:   true,
-		ResourceUpToDate: false,
+		ResourceUpToDate: true,
 	}, nil
 }
 
