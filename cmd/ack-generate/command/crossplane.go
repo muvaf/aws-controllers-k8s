@@ -22,6 +22,7 @@ import (
 
 	"github.com/aws/aws-controllers-k8s/pkg/generate"
 	"github.com/aws/aws-controllers-k8s/pkg/model"
+	ackmodel "github.com/aws/aws-controllers-k8s/pkg/model"
 )
 
 // crossplaneCmd is the command that generates Crossplane API types
@@ -31,23 +32,35 @@ var crossplaneCmd = &cobra.Command{
 	RunE:  generateCrossplane,
 }
 
+var providerDir string
+
 func init() {
+	crossplaneCmd.PersistentFlags().StringVar(
+		&providerDir, "provider-dir", ".", "the directory of the Crossplane provider",
+	)
 	rootCmd.AddCommand(crossplaneCmd)
 }
 
-// generateCrossplane generates the Go files for Crossplane-compatible
-// resources in the AWS service API.
 func generateCrossplane(cmd *cobra.Command, args []string) error {
+	if err := generateCrossplaneAPIs(cmd, args); err != nil {
+		return err
+	}
+	if err := generateCrossplaneControllers(cmd, args); err != nil {
+		return err
+	}
+	return nil
+}
+
+// generateCrossplaneAPIs generates the Go files for Crossplane-compatible
+// resources in the AWS service API.
+func generateCrossplaneAPIs(_ *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("please specify the service alias for the AWS service API to generate")
 	}
 	optTemplatesDir = filepath.Join(optTemplatesDir, "crossplane")
 	svcAlias := strings.ToLower(args[0])
-	if optAPIsOutputPath == "" {
-		optAPIsOutputPath = filepath.Join(optServicesDir, "crossplane")
-	}
 	if !optDryRun {
-		apisVersionPath = filepath.Join(optAPIsOutputPath, svcAlias, "apis", optGenVersion)
+		apisVersionPath = filepath.Join(providerDir, "apis", svcAlias, optGenVersion)
 		if _, err := ensureDir(apisVersionPath); err != nil {
 			return err
 		}
@@ -100,6 +113,50 @@ func generateCrossplane(cmd *cobra.Command, args []string) error {
 		if err = writeCRDGo(g, crd); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// generateCrossplaneControllers generates the Go files for a service controller
+func generateCrossplaneControllers(_ *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("please specify the service alias for the AWS service API to generate")
+	}
+	svcAlias := strings.ToLower(args[0])
+	optControllerOutputPath = providerDir
+	if !optDryRun {
+		pkgResourcePath = filepath.Join(providerDir, "pkg", "controller", svcAlias)
+		if _, err := ensureDir(pkgResourcePath); err != nil {
+			return err
+		}
+	}
+
+	if err := ensureSDKRepo(optCacheDir); err != nil {
+		return err
+	}
+	sdkHelper := ackmodel.NewSDKHelper(sdkDir)
+	sdkAPI, err := sdkHelper.API(svcAlias)
+	if err != nil {
+		return err
+	}
+	latestAPIVersion, err = getLatestAPIVersion()
+	if err != nil {
+		return err
+	}
+	g, err := generate.New(
+		sdkAPI, latestAPIVersion, optGeneratorConfigPath, optTemplatesDir,
+	)
+	if err != nil {
+		return err
+	}
+
+	crds, err := g.GetCRDs()
+	if err != nil {
+		return err
+	}
+
+	if err = writeResourcePackage(g, crds); err != nil {
+		return err
 	}
 	return nil
 }

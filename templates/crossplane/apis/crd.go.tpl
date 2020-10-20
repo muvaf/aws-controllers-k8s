@@ -11,6 +11,7 @@ import (
 {{- end }}
     cpv1alpha1 "github.com/crossplane/crossplane-runtime/apis/core/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // {{ .CRD.Kind }}SpecParams defines the desired state of {{ .CRD.Kind }}
@@ -36,7 +37,7 @@ type {{ .CRD.Kind }}ExternalStatus struct {
 
 // {{ .CRD.Kind }}Status defines the observed state of {{ .CRD.Kind }}
 type {{ .CRD.Kind }}Status struct {
-	runtimev1alpha1.ResourceStatus `json:",inline"`
+	cpv1alpha1.ResourceStatus `json:",inline"`
 	AtProvider {{ .CRD.Kind }}ExternalStatus `json:"atProvider"`
 }
 
@@ -57,6 +58,14 @@ type {{ .CRD.Kind }}List struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items []{{ .CRD.Kind }} `json:"items"`
 }
+
+// {{ .CRD.Kind }} type metadata.
+var (
+	{{ .CRD.Kind }}Kind             = "{{ .CRD.Kind }}"
+	{{ .CRD.Kind }}GroupKind        = schema.GroupKind{Group: "{{ .APIGroup }}", Kind: {{ .CRD.Kind }}Kind}.String()
+	{{ .CRD.Kind }}KindAPIVersion   = {{ .CRD.Kind }}Kind + "." + SchemeGroupVersion.String()
+	{{ .CRD.Kind }}GroupVersionKind = SchemeGroupVersion.WithKind({{ .CRD.Kind }}Kind)
+)
 
 func init() {
 	SchemeBuilder.Register(&{{ .CRD.Kind }}{}, &{{ .CRD.Kind }}List{})

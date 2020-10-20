@@ -4,151 +4,97 @@ package {{ .CRD.Names.Snake }}
 
 import (
 	"context"
-	"fmt"
 
-	ackv1alpha1 "github.com/aws/aws-controllers-k8s/apis/core/v1alpha1"
-	ackrt "github.com/aws/aws-controllers-k8s/pkg/runtime"
-	acktypes "github.com/aws/aws-controllers-k8s/pkg/types"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pkg/errors"
+	runtimev1alpha1 "github.com/crossplane/crossplane-runtime/apis/core/v1alpha1"
+	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/logging"
+	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
+	cpresource "github.com/crossplane/crossplane-runtime/pkg/resource"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	awsclients "github.com/crossplane/provider-aws/pkg/clients"
 
-	svcsdk "github.com/aws/aws-sdk-go/service/{{ .ServiceIDClean }}"
-	svcsdkapi "github.com/aws/aws-sdk-go/service/{{ .ServiceIDClean }}/{{ .ServiceIDClean }}iface"
+	"github.com/muvaf/test-generated-aws/apis/{{ .ServiceIDClean }}/{{ .APIVersion}}"
 )
 
-// +kubebuilder:rbac:groups={{ .APIGroup }},resources={{ ToLower .CRD.Plural }},verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups={{ .APIGroup }},resources={{ ToLower .CRD.Plural }}/status,verbs=get;update;patch
+const (
+	errUnexpectedObject = "managed resource is not an repository resource"
+)
 
-// resourceManager is responsible for providing a consistent way to perform
-// CRUD operations in a backend AWS service API for Book custom resources.
-type resourceManager struct {
-	// rr is the AWSResourceReconciler which can be used for various utility
-	// functions such as querying for Secret values given a SecretReference
-	rr acktypes.AWSResourceReconciler
-	// awsAccountID is the AWS account identifier that contains the resources
-	// managed by this resource manager
-	awsAccountID ackv1alpha1.AWSAccountID
-	// The AWS Region that this resource manager targets
-	awsRegion ackv1alpha1.AWSRegion
-	// sess is the AWS SDK Session object used to communicate with the backend
-	// AWS service API
-	sess *session.Session
-	// sdk is a pointer to the AWS service API interface exposed by the
-	// aws-sdk-go/services/{alias}/{alias}iface package.
-	sdkapi svcsdkapi.{{ .SDKAPIInterfaceTypeName }}API
+// Setup{{ .CRD.Names.Camel }} adds a controller that reconciles {{ .CRD.Names.Camel }}.
+func Setup{{ .CRD.Names.Camel }}(mgr ctrl.Manager, l logging.Logger) error {
+	name := managed.ControllerName({{ .APIVersion}}.{{ .CRD.Names.Camel }}GroupKind)
+	return ctrl.NewControllerManagedBy(mgr).
+		Named(name).
+		For(&{{ .APIVersion}}.{{ .CRD.Names.Camel }}{}).
+		Complete(managed.NewReconciler(mgr,
+			cpresource.ManagedKind({{ .APIVersion}}.{{ .CRD.Names.Camel }}GroupVersionKind),
+			managed.WithExternalConnecter(&connector{kube: mgr.GetClient()}),
+			managed.WithReferenceResolver(managed.NewAPISimpleReferenceResolver(mgr.GetClient())),
+			managed.WithConnectionPublishers(),
+			managed.WithLogger(l.WithValues("controller", name)),
+			managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name)))))
 }
 
-// concreteResource returns a pointer to a resource from the supplied
-// generic AWSResource interface
-func (rm *resourceManager) concreteResource(
-	res acktypes.AWSResource,
-) *resource {
-	// cast the generic interface into a pointer type specific to the concrete
-	// implementing resource type managed by this resource manager
-	return res.(*resource)
+type connector struct {
+	kube client.Client
 }
 
-// ReadOne returns the currently-observed state of the supplied AWSResource in
-// the backend AWS service API.
-func (rm *resourceManager) ReadOne(
-	ctx context.Context,
-	res acktypes.AWSResource,
-) (acktypes.AWSResource, error) {
-	r := rm.concreteResource(res)
-	if r.ko == nil {
-		// Should never happen... if it does, it's buggy code.
-		panic("resource manager's ReadOne() method received resource with nil CR object")
+func (c *connector) Connect(ctx context.Context, mg cpresource.Managed) (managed.ExternalClient, error) {
+	cr, ok := mg.(*{{ .APIVersion}}.{{ .CRD.Names.Camel }})
+	if !ok {
+		return nil, errors.New(errUnexpectedObject)
 	}
-	observed, err := rm.sdkFind(ctx, r)
+	cfg, err := awsclients.GetConfig(ctx, c.kube, mg, cr.Spec.ForProvider.Region)
 	if err != nil {
 		return nil, err
 	}
-	return observed, nil
+	return &external{client: awsecr.New(*cfg), kube: c.kube}, nil
 }
 
-// Create attempts to create the supplied AWSResource in the backend AWS
-// service API, returning an AWSResource representing the newly-created
-// resource
-func (rm *resourceManager) Create(
-	ctx context.Context,
-	res acktypes.AWSResource,
-) (acktypes.AWSResource, error) {
-	r := rm.concreteResource(res)
-	if r.ko == nil {
-		// Should never happen... if it does, it's buggy code.
-		panic("resource manager's Create() method received resource with nil CR object")
-	}
-	created, err := rm.sdkCreate(ctx, r)
-	if err != nil {
-		return nil, err
-	}
-	return created, nil
+type external struct {
+	kube   client.Client
+	client ecr.RepositoryClient
 }
 
-// Update attempts to mutate the supplied AWSResource in the backend AWS
-// service API, returning an AWSResource representing the newly-mutated
-// resource. Note that implementers should NOT check to see if the latest
-// observed resource differs from the supplied desired state. The higher-level
-// reonciler determines whether or not the desired differs from the latest
-// observed and decides whether to call the resource manager's Update method
-func (rm *resourceManager) Update(
-	ctx context.Context,
-	res acktypes.AWSResource,
-) (acktypes.AWSResource, error) {
-	r := rm.concreteResource(res)
-	if r.ko == nil {
-		// Should never happen... if it does, it's buggy code.
-		panic("resource manager's Update() method received resource with nil CR object")
+func (e *external) Observe(ctx context.Context, mg cpresource.Managed) (managed.ExternalObservation, error) {
+	cr, ok := mg.(*{{ .APIVersion}}.{{ .CRD.Names.Camel }})
+	if !ok {
+		return managed.ExternalObservation{}, errors.New(errUnexpectedObject)
 	}
-	updated, err := rm.sdkUpdate(ctx, r)
-	if err != nil {
-		return nil, err
-	}
-	return updated, nil
-}
 
-// Delete attempts to destroy the supplied AWSResource in the backend AWS
-// service API.
-func (rm *resourceManager) Delete(
-	ctx context.Context,
-	res acktypes.AWSResource,
-) error {
-	r := rm.concreteResource(res)
-	if r.ko == nil {
-		// Should never happen... if it does, it's buggy code.
-		panic("resource manager's Update() method received resource with nil CR object")
-	}
-	return rm.sdkDelete(ctx, r)
-}
+	cr.SetConditions(runtimev1alpha1.Available())
 
-// ARNFromName returns an AWS Resource Name from a given string name. This
-// is useful for constructing ARNs for APIs that require ARNs in their
-// GetAttributes operations but all we have (for new CRs at least) is a
-// name for the resource
-func (rm *resourceManager) ARNFromName(name string) string {
-	return fmt.Sprintf(
-		"arn:aws:{{ .ServiceIDClean }}:%s:%s:%s",
-		rm.awsRegion,
-		rm.awsAccountID,
-		name,
-	)
-}
-
-// newResourceManager returns a new struct implementing
-// acktypes.AWSResourceManager
-func newResourceManager(
-	rr acktypes.AWSResourceReconciler,
-	id ackv1alpha1.AWSAccountID,
-	region ackv1alpha1.AWSRegion,
-) (*resourceManager, error) {
-	sess, err := ackrt.NewSession()
-	if err != nil {
-		return nil, err
-	}
-	return &resourceManager{
-		rr: rr,
-		awsAccountID: id,
-		awsRegion: region,
-		sess:		 sess,
-		sdkapi:	   svcsdk.New(sess),
+	return managed.ExternalObservation{
+		ResourceExists:   true,
+		ResourceUpToDate: false,
 	}, nil
+}
+
+func (e *external) Create(ctx context.Context, mg cpresource.Managed) (managed.ExternalCreation, error) {
+	cr, ok := mg.(*{{ .APIVersion}}.{{ .CRD.Names.Camel }})
+	if !ok {
+		return managed.ExternalCreation{}, errors.New(errUnexpectedObject)
+	}
+	cr.Status.SetConditions(runtimev1alpha1.Creating())
+	return managed.ExternalCreation{}, nil
+}
+
+func (e *external) Update(ctx context.Context, mg cpresource.Managed) (managed.ExternalUpdate, error) {
+	cr, ok := mg.(*{{ .APIVersion}}.{{ .CRD.Names.Camel }})
+	if !ok {
+		return managed.ExternalUpdate{}, errors.New(errUnexpectedObject)
+	}
+	cr.SetConditions(runtimev1alpha1.Available())
+	return managed.ExternalUpdate{}, nil
+}
+
+func (e *external) Delete(ctx context.Context, mg cpresource.Managed) error {
+	cr, ok := mg.(*{{ .APIVersion}}.{{ .CRD.Names.Camel }})
+	if !ok {
+		return errors.New(errUnexpectedObject)
+	}
+	cr.Status.SetConditions(runtimev1alpha1.Deleting())
+	return nil
 }
