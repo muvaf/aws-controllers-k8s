@@ -42,6 +42,9 @@ type Config struct {
 	// SetManyOutput function fails with NotFound error.
 	// Default is "return nil, ackerr.NotFound"
 	SetManyOutputNotFoundErrReturn string `json:"set_many_output_notfound_err_return,omitempty"`
+	// Referencers is the list of fields whose value can be resolved by taking
+	// a value from another instance of a given type.
+	Referencers []ReferencerConfig `json:"referencers,omitempty"`
 }
 
 // OperationConfig represents instructions to the ACK code generator to
@@ -135,6 +138,23 @@ type ResourceConfig struct {
 	// Compare contains instructions for the code generation to generate custom
 	// comparison logic.
 	Compare *CompareConfig `json:"compare,omitempty"`
+}
+
+// ReferencerConfig infroms the code generator about the fields that can be
+// referencer to other objects.
+type ReferencerConfig struct {
+	// TypeName is the name of the struct that has the field to be used as referencer.
+	// If it's top level field of a CRD, use its name directly, for example "Topic"
+	// or "API".
+	TypeName string
+
+	// FieldName is the name of the field whose value might be resolved by a
+	// reference.
+	FieldName string
+
+	// ReferencedType is the type of the referenced CRD.
+	// Example value would be "ec2/v1beta1/vpc".
+	ReferencedType string
 }
 
 // CompareConfig informs instruct the code generator on how to compare two different

@@ -8,12 +8,11 @@ import (
 	svcsdk "github.com/aws/aws-sdk-go/service/{{ .ServiceIDClean }}"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	runtimev1alpha1 "github.com/crossplane/crossplane-runtime/apis/core/v1alpha1"
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
 	"github.com/crossplane/crossplane-runtime/pkg/logging"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
-
 
 	svcapitypes "github.com/crossplane/provider-aws/apis/{{ .ServiceIDClean }}/{{ .APIVersion}}"
 )
@@ -40,7 +39,7 @@ func (*external) postObserve(_ context.Context, cr *svcapitypes.{{ .CRD.Names.Ca
 	if err != nil {
   		return managed.ExternalObservation{}, err
   	}
-  cr.SetConditions(runtimev1alpha1.Available())
+  cr.SetConditions(xpv1.Available())
 	return obs, err
 }
 {{- else if .CRD.Ops.GetAttributes }}
@@ -48,7 +47,7 @@ func (*external) postObserve(_ context.Context, cr *svcapitypes.{{ .CRD.Names.Ca
 	if err != nil {
 		return managed.ExternalObservation{}, err
 	}
-	cr.SetConditions(runtimev1alpha1.Available())
+	cr.SetConditions(xpv1.Available())
 	return obs, nil
 }
 {{- else if .CRD.Ops.ReadMany }}
@@ -56,7 +55,7 @@ func (*external) postObserve(_ context.Context, cr *svcapitypes.{{ .CRD.Names.Ca
 	if err != nil {
   		return managed.ExternalObservation{}, err
   	}
-  cr.SetConditions(runtimev1alpha1.Available())
+  cr.SetConditions(xpv1.Available())
 	return obs, err
 }
 

@@ -64,6 +64,8 @@ type CRDField struct {
 	GoType            string
 	GoTypeElem        string
 	GoTypeWithPkgName string
+	IsSlice           bool
+	ReferencedType    *string
 	ShapeRef          *awssdkmodel.ShapeRef
 	FieldConfig       *ackgenconfig.FieldConfig
 }
@@ -93,6 +95,13 @@ func newCRDField(
 		gt = "*string"
 		gtwp = "*string"
 	}
+	var refType *string
+	for _, ref := range crd.genCfg.Referencers {
+		if ref.TypeName == crd.Names.Camel && ref.FieldName == fieldNames.Camel {
+			refType = &ref.ReferencedType
+			break
+		}
+	}
 	return &CRDField{
 		CRD:               crd,
 		Names:             fieldNames,
@@ -100,6 +109,8 @@ func newCRDField(
 		GoType:            gt,
 		GoTypeElem:        gte,
 		GoTypeWithPkgName: gtwp,
+		IsSlice:           strings.HasPrefix(gt, "[]"),
+		ReferencedType:    refType,
 		FieldConfig:       cfg,
 	}
 }

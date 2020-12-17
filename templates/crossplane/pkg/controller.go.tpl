@@ -144,7 +144,6 @@ func (e *external) Delete(ctx context.Context, mg cpresource.Managed) error {
 		return errors.New(errUnexpectedObject)
 	}
 	cr.Status.SetConditions(xpv1.Deleting())
-	{{- if .CRD.Ops.Delete }}
   input := Generate{{ .CRD.Ops.Delete.InputRef.Shape.ShapeName }}(cr)
   _, err := e.client.{{ .CRD.Ops.Delete.Name }}WithContext(ctx, input)
 	return errors.Wrap(cpresource.Ignore(IsNotFound, err), errDelete)

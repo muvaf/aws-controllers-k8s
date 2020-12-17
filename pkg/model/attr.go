@@ -15,24 +15,30 @@ package model
 
 import (
 	awssdkmodel "github.com/aws/aws-sdk-go/private/model/api"
+	"strings"
 
 	"github.com/aws/aws-controllers-k8s/pkg/names"
 )
 
 type Attr struct {
-	Names  names.Names
-	GoType string
-	Shape  *awssdkmodel.Shape
+	Names          names.Names
+	GoType         string
+	Shape          *awssdkmodel.Shape
+	IsSlice        bool
+	ReferencedType *string
 }
 
 func NewAttr(
 	names names.Names,
 	goType string,
 	shape *awssdkmodel.Shape,
+	referencedType *string,
 ) *Attr {
 	return &Attr{
-		Names:  names,
-		GoType: goType,
-		Shape:  shape,
+		Names:          names,
+		GoType:         goType,
+		Shape:          shape,
+		IsSlice:        strings.HasPrefix(goType, "[]"),
+		ReferencedType: referencedType,
 	}
 }

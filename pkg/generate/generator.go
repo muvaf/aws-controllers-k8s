@@ -346,7 +346,14 @@ func (g *Generator) GetTypeDefs() ([]*ackmodel.TypeDef, map[string]string, error
 				// otherwise there is no DeepCopy support
 				gt = "*metav1.Time"
 			}
-			attrs[memberName] = ackmodel.NewAttr(memberNames, gt, memberShape)
+			var refType *string
+			for _, ref := range g.cfg.Referencers {
+				if ref.FieldName == memberNames.Camel && ref.TypeName == tdefNames.Camel {
+					refType = &ref.ReferencedType
+					break
+				}
+			}
+			attrs[memberName] = ackmodel.NewAttr(memberNames, gt, memberShape, refType)
 		}
 		if len(attrs) == 0 {
 			// Just ignore these...
