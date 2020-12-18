@@ -152,7 +152,6 @@ func Crossplane(
 	targets := []string{
 		"controller.go.tpl",
 		"conversions.go.tpl",
-		"hooks.go.tpl",
 	}
 	for _, crd := range crds {
 		for _, target := range targets {
@@ -169,5 +168,21 @@ func Crossplane(
 			}
 		}
 	}
+
+	// Finally, generate the single hooks.go file from one of the CRDs (doesn't
+	// matter which since the hooks.go is generic for all CRs)
+	crd := crds[0]
+	outPath := filepath.Join(
+		"pkg", "controller", metaVars.ServiceIDClean, crd.Names.Snake,
+		"hooks.go",
+	)
+	crdVars := &templateCRDVars{
+		metaVars,
+		crd,
+	}
+	if err = ts.Add(outPath, "pkg/hooks.go.tpl", crdVars); err != nil {
+		return nil, err
+	}
+
 	return ts, nil
 }

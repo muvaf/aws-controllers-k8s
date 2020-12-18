@@ -99,8 +99,8 @@ func generateCrossplane(_ *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	apiPath := filepath.Join(providerDir, "apis", optGenVersion)
-	controllerPath := filepath.Join(providerDir, "pkg", "controller")
+	apiPath := filepath.Join(providerDir, "apis", svcAlias, optGenVersion)
+	controllerPath := filepath.Join(providerDir, "pkg", "controller", svcAlias)
 	// TODO(muvaf): goimports don't allow to be included as a library. Make sure
 	// goimports binary exists.
 	if err := exec.Command("goimports", "-w", apiPath, controllerPath).Run(); err != nil {
