@@ -16,6 +16,7 @@ package command
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -94,6 +95,16 @@ func generateCrossplane(_ *cobra.Command, args []string) error {
 		outDir := filepath.Dir(outPath)
 		if _, err := ensureDir(outDir); err != nil {
 			return err
+		}
+		// NOTE(muvaf): We should not overwrite if hooks.go already exists.
+		if strings.HasSuffix(outPath, "hooks.go") {
+			_, err := os.Stat(outPath)
+			if err != nil && !os.IsNotExist(err) {
+				return err
+			}
+			if !os.IsNotExist(err) {
+				continue
+			}
 		}
 		if err = ioutil.WriteFile(outPath, contents.Bytes(), 0666); err != nil {
 			return err

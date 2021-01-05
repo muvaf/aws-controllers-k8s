@@ -129,7 +129,8 @@ func Crossplane(
 		typeImports,
 	}
 	for _, path := range apisTemplatePaths {
-		outPath := "zz_" + strings.TrimSuffix(filepath.Base(path), ".tpl")
+		outPath := filepath.Join("apis", metaVars.ServiceIDClean, metaVars.APIVersion,
+			"zz_"+strings.TrimSuffix(filepath.Base(path), ".tpl"))
 		if err = ts.Add(outPath, path, apiVars); err != nil {
 			return nil, err
 		}
@@ -156,8 +157,8 @@ func Crossplane(
 	for _, crd := range crds {
 		for _, target := range targets {
 			outPath := filepath.Join(
-				"pkg", "controller", metaVars.ServiceIDClean, crd.Names.Snake,
-				"zz_"+target,
+				"pkg", "controller", metaVars.ServiceIDClean, crd.Names.Lower,
+				"zz_"+strings.TrimSuffix(filepath.Base(target), ".tpl"),
 			)
 			crdVars := &templateCRDVars{
 				metaVars,
@@ -167,22 +168,17 @@ func Crossplane(
 				return nil, err
 			}
 		}
+		outPath := filepath.Join(
+			"pkg", "controller", metaVars.ServiceIDClean, crd.Names.Lower,
+			"hooks.go",
+		)
+		crdVars := &templateCRDVars{
+			metaVars,
+			crd,
+		}
+		if err = ts.Add(outPath, "pkg/hooks.go.tpl", crdVars); err != nil {
+			return nil, err
+		}
 	}
-
-	// Finally, generate the single hooks.go file from one of the CRDs (doesn't
-	// matter which since the hooks.go is generic for all CRs)
-	crd := crds[0]
-	outPath := filepath.Join(
-		"pkg", "controller", metaVars.ServiceIDClean, crd.Names.Snake,
-		"hooks.go",
-	)
-	crdVars := &templateCRDVars{
-		metaVars,
-		crd,
-	}
-	if err = ts.Add(outPath, "pkg/hooks.go.tpl", crdVars); err != nil {
-		return nil, err
-	}
-
 	return ts, nil
 }
